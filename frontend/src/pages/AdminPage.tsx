@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, useNavigate, useOutletContext } from 'react-router-dom'
 import type { LayoutContext } from '../components/Layout'
+import TagVocabularyManager from '../components/TagVocabularyManager'
 import { fetchAdminUsers, setUserRole } from '../api/admin'
 import { formatDate } from '../utils/formatDate'
 import type { AdminUserPage, AdminUserSummary } from '../types'
@@ -151,6 +152,8 @@ function AdminPage() {
           </button>
         </div>
       )}
+
+      <TagVocabularyManager />
     </div>
   )
 }

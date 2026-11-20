@@ -9,9 +9,10 @@ import { deleteAttachment, uploadAttachment } from '../api/attachments'
 import { deleteDraft, fetchDraft, saveDraft } from '../api/drafts'
 import type { Draft } from '../api/drafts'
 import { ApiError } from '../api/client'
+import { suggestTags } from '../api/tags'
 import { buildHashedRelease } from '../utils/hashFile'
 import type { HashedRelease } from '../utils/hashFile'
-import type { Attachment } from '../types'
+import type { Attachment, TagSuggestion } from '../types'
 import './WritePage.css'
 
 interface AttachedFile {
@@ -28,6 +29,14 @@ function formatSavedAt(iso: string) {
 // 제목/태그 입력창에서 Enter 로 폼이 바로 제출되는 것을 막는다
 function preventEnterSubmit(event: KeyboardEvent<HTMLInputElement>) {
   if (event.key === 'Enter') event.preventDefault()
+}
+
+// 쉼표로 구분한 태그 입력을 배열로
+function parseTags(input: string) {
+  return input
+    .split(',')
+    .map((tag) => tag.trim())
+    .filter(Boolean)
 }
 
 function isDraftEmpty(draft: Pick<Draft, 'title' | 'tagsInput' | 'content'>) {
@@ -57,6 +66,9 @@ function WritePage() {
   const [loadingPost, setLoadingPost] = useState(isEdit)
   const [loadFailed, setLoadFailed] = useState(false)
   const editorRef = useRef<BlockEditorHandle>(null)
+  const [suggestions, setSuggestions] = useState<TagSuggestion[]>([])
+  const [suggesting, setSuggesting] = useState(false)
+  const [suggestMessage, setSuggestMessage] = useState<string | null>(null)
 
   // 비로그인이면 로그인 후 이 페이지로 돌아오도록
   useEffect(() => {
@@ -185,10 +197,7 @@ function WritePage() {
     if (submitting || isHashing) return
     if (!title.trim() || !content.trim()) return
 
-    const tags = tagsInput
-      .split(',')
-      .map((tag) => tag.trim())
-      .filter(Boolean)
+    const tags = parseTags(tagsInput)
 
     setSubmitting(true)
     setError(null)
@@ -215,6 +224,36 @@ function WritePage() {
       setSubmitting(false)
     }
   }
+
+  // 태그 추천: 버튼을 눌렀을 때만 호출한다. 추천 태그는 칩을 눌러야 입력란에 들어간다
+  const handleSuggestTags = async () => {
+    if (suggesting) return
+    setSuggesting(true)
+    setSuggestMessage(null)
+    try {
+      const result = await suggestTags({ title, content, exclude: parseTags(tagsInput) })
+      setSuggestions(result.tags)
+      if (result.tags.length === 0) setSuggestMessage('추천할 태그가 없습니다')
+    } catch (err) {
+      setSuggestions([])
+      if (err instanceof ApiError && err.status === 429) {
+        setSuggestMessage('잠시 후 다시 시도해 주세요')
+      } else {
+        setSuggestMessage(err instanceof Error ? err.message : '태그 추천에 실패했습니다')
+      }
+    } finally {
+      setSuggesting(false)
+    }
+  }
+
+  const addSuggestedTag = (name: string) => {
+    setTagsInput((prev) => [...parseTags(prev), name].join(', '))
+    setSuggestions((prev) => prev.filter((tag) => tag.name !== name))
+  }
+
+  // 사용자가 직접 입력한 태그와 겹치는 추천은 숨긴다
+  const currentTags = new Set(parseTags(tagsInput).map((tag) => tag.toLowerCase()))
+  const visibleSuggestions = suggestions.filter((tag) => !currentTags.has(tag.name))
 
   // 로그인 확인 전이거나 비로그인으로 리다이렉트되는 중에는 그리지 않는다
   if (!user) return null
@@ -262,14 +301,42 @@ function WritePage() {
           required
         />
 
-        <input
-          className="write-form__tags"
-          type="text"
-          value={tagsInput}
-          onChange={(event) => setTagsInput(event.target.value)}
-          onKeyDown={preventEnterSubmit}
-          placeholder="태그 추가 (쉼표로 구분, 예: react, frontend)"
-        />
+        <div className="write-form__tags-row">
+          <input
+            className="write-form__tags"
+            type="text"
+            value={tagsInput}
+            onChange={(event) => setTagsInput(event.target.value)}
+            onKeyDown={preventEnterSubmit}
+            placeholder="태그 추가 (쉼표로 구분, 예: react, frontend)"
+          />
+          <button
+            type="button"
+            className="write-form__suggest"
+            onClick={handleSuggestTags}
+            disabled={suggesting || (!title.trim() && !content.trim())}
+            title="제목과 본문을 보고 태그 목록에서 알맞은 태그를 추천합니다"
+          >
+            {suggesting ? '추천 중…' : '태그 추천'}
+          </button>
+        </div>
+
+        {(visibleSuggestions.length > 0 || suggestMessage) && (
+          <div className="write-form__suggestions">
+            {visibleSuggestions.map((tag) => (
+              <button
+                key={tag.name}
+                type="button"
+                className="write-form__suggestion"
+                onClick={() => addSuggestedTag(tag.name)}
+                title="클릭하면 태그에 추가합니다"
+              >
+                + {tag.name}
+              </button>
+            ))}
+            {suggestMessage && <span className="write-form__hint">{suggestMessage}</span>}
+          </div>
+        )}
 
         <div className="write-form__editor">
           <BlockEditor ref={editorRef} onChange={setContent} initialContent={initialContent} />

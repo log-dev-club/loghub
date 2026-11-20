@@ -9,4 +9,5 @@ pub mod draft;
 pub mod image;
 pub mod post;
 pub mod tag;
+pub mod tag_vocabulary;
 pub mod user;

@@ -9,6 +9,8 @@ pub mod drafts;
 pub mod github;
 pub mod images;
 pub mod posts;
+pub mod tag_suggest;
+pub mod tag_vocabulary;
 pub mod tags;
 pub mod users;
 

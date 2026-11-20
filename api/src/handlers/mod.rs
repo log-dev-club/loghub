@@ -7,5 +7,6 @@ pub mod comments;
 pub mod drafts;
 pub mod images;
 pub mod posts;
+pub mod tag_vocabulary;
 pub mod tags;
 pub mod users;

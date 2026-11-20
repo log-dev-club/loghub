@@ -5,7 +5,11 @@ use std::{collections::HashSet, sync::LazyLock};
 use regex::Regex;
 use sqlx::{PgPool, Postgres, QueryBuilder, Transaction};
 
-use super::{attachments, like_pattern, truncate_chars};
+use super::{
+    attachments, like_pattern,
+    tags::{TAG_MAX_LEN, normalize_tag},
+    truncate_chars,
+};
 use crate::{
     error::AppError,
     models::{
@@ -19,7 +23,6 @@ use crate::{
 
 const TITLE_MAX: usize = 200;
 const SUMMARY_MAX: usize = 300;
-const TAG_MAX_LEN: usize = 50;
 const TAG_MAX_COUNT: usize = 10;
 
 // 이미지: `![alt](url)` 통째로 제거 (base64 데이터 URI가 통째로 요약에 섞여 들어가는 것을 방지)
@@ -166,7 +169,7 @@ fn normalize_tags(tags: Vec<String>) -> Result<Vec<String>, AppError> {
     let mut seen = HashSet::new();
     let mut out = Vec::new();
     for raw in tags {
-        let tag = raw.trim().trim_start_matches('#').to_lowercase();
+        let tag = normalize_tag(&raw);
         if tag.is_empty() {
             continue;
         }

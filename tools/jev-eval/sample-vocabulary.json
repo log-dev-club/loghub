@@ -1,0 +1,17 @@
+[
+  { "name": "react", "description": "React UI 라이브러리", "aliases": ["jsx", "usestate", "useeffect", "리액트"] },
+  { "name": "svelte", "description": "Svelte 프론트엔드 프레임워크", "aliases": ["sveltekit", "스벨트"] },
+  { "name": "typescript", "description": "타입이 있는 JavaScript", "aliases": ["ts", "tsconfig", "타입스크립트"] },
+  { "name": "rust", "description": "Rust 언어", "aliases": ["cargo", "tokio", "러스트"] },
+  { "name": "axum", "description": "Rust 웹 프레임워크 axum", "aliases": ["tower", "extractor"] },
+  { "name": "go", "description": "Go 언어", "aliases": ["golang", "goroutine", "고루틴"] },
+  { "name": "python", "description": "Python 언어", "aliases": ["pip", "venv", "파이썬"] },
+  { "name": "postgresql", "description": "PostgreSQL 데이터베이스", "aliases": ["postgres", "sqlx", "psql", "포스트그레스"] },
+  { "name": "docker", "description": "컨테이너와 Docker", "aliases": ["dockerfile", "compose", "컨테이너"] },
+  { "name": "ci-cd", "description": "지속적 통합과 배포 자동화", "aliases": ["github actions", "workflow", "배포 자동화"] },
+  { "name": "algorithm", "description": "알고리즘과 자료구조", "aliases": ["dp", "bfs", "dfs", "이분 탐색", "알고리즘"] },
+  { "name": "security", "description": "웹 보안", "aliases": ["xss", "csrf", "인증", "보안"] },
+  { "name": "performance", "description": "성능 측정과 최적화", "aliases": ["profiling", "benchmark", "최적화", "성능"] },
+  { "name": "retrospective", "description": "프로젝트 회고", "aliases": ["회고", "kpt", "돌아보기"] },
+  { "name": "기타", "description": "짧은 글, 일상 글, 공지", "aliases": ["일상", "잡담", "공지", "일정", "근황", "스터디", "모임"] }
+]

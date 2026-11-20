@@ -122,7 +122,7 @@ api/src/
 ├── error.rs         # AppError → { "error": msg } + 상태 코드. sqlx/io/multipart 에러 From 변환 포함
 ├── extract.rs       # CurrentUser(로그인 필수, 401) / MaybeUser(선택) 추출기
 ├── rate_limit.rs    # IP 당 요청 횟수 제한 레이어 (tower_governor). 무차별 대입 대상 라우터에만 적용
-├── routes/          # 도메인별 Router<AppState> (auth, users, posts, comments, attachments, tags)
+├── routes/          # 도메인별 Router<AppState> (auth, users, admin, posts, comments, attachments, images, tags, tag_vocabulary)
 ├── handlers/        # axum 핸들러. 요청 파싱 → 서비스 호출 → 응답 변환. DB 쿼리 작성 금지
 ├── services/        # 비즈니스 로직 + DB 접근 (검증, 트랜잭션, 첨부파일 해시 검증, Discord 알림)
 └── models/          # DB row 구조체 (sqlx::FromRow) 및 요청/응답 DTO (serde, camelCase)
@@ -159,6 +159,7 @@ frontend/src/
 | `comments` | `20260913000000_init.sql` | 댓글 | `post_id`, `user_id`, `content`, `updated_at` |
 | `post_stars` | `20260914000000_add_auth_stars_profile.sql` | 별 | PK(`post_id`, `user_id`) |
 | `post_attachments` | `20260913000001_add_post_attachments.sql` | 첨부 릴리즈 파일 | `post_id`, `original_name`, `hashed_name` (UNIQUE, 디스크 파일명), `size_bytes`, `sent_at` |
+| `tag_vocabulary` / `tag_aliases` | `20261120100000_add_tag_vocabulary.sql` | 태그 추천 후보 목록 (관리자 관리, `tags` 와 별개) | `name` (UNIQUE, 소문자), `description`, `aliases` (PK(`vocabulary_id`, `alias`), CASCADE) |
 
 - 데이터베이스 생성은 마이그레이션이 아니라 `main.rs` 시작 단계(`Postgres::create_database`)에서 한다. 마이그레이션 SQL 은 이미 접속한 DB 안에서 실행되므로 `CREATE DATABASE` 를 넣을 수 없다.
 - 스키마 변경은 기존 파일을 수정하지 말고 **새 마이그레이션 파일을 추가**한다. 이미 적용된 마이그레이션은 절대 수정하지 않는다. (수정하면 서버 기동 시 체크섬 불일치로 실패하며, 이미 적용한 팀원은 DB 를 지우고 다시 만들어야 한다.)
@@ -202,8 +203,11 @@ frontend/src/
 | GET / POST | `/api/posts/{id}/attachments` | – / 작성자 | 첨부 목록 / 업로드 (multipart: `file`, `hashedName`, `sentAt`) |
 | GET / DELETE | `/api/attachments/{hashedName}` | – / 작성자 | 다운로드 (원본 파일명) / 삭제 |
 | GET | `/api/tags` | – | 사용 중인 태그와 게시물 수 |
+| POST | `/api/tags/suggestions` | 필요 | 제목·본문으로 태그 추천 (태그 추천 목록 안에서, 최대 5개) |
 | GET | `/api/admin/users` | 관리자 | 전체 사용자 목록 (`q` 닉네임 검색, 페이지) |
 | PUT | `/api/admin/users/{nickname}/role` | 최고 관리자 | 관리자 권한 부여/해제 (`role`: `user` \| `admin`) |
+| GET / POST | `/api/admin/tag-vocabulary` | 관리자 | 태그 추천 목록 조회 / 추가 (`name`, `description`, `aliases`) |
+| PATCH / DELETE | `/api/admin/tag-vocabulary/{id}` | 관리자 | 수정 (`aliases` 는 전체 교체) / 삭제 |
 
 ## 기능 명세
 

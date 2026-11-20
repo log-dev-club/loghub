@@ -1,0 +1,74 @@
+[
+  {
+    "id": "s01",
+    "title": "useEffect 의존성 배열 정리",
+    "content": "리액트에서 useEffect 를 쓸 때 의존성 배열을 빼먹으면 무한 렌더링이 생긴다. 이번 글에서는 자주 하는 실수 세 가지를 정리한다.",
+    "expected": ["react"]
+  },
+  {
+    "id": "s02",
+    "title": "React 대신 Svelte 를 고른 이유",
+    "content": "사이드 프로젝트에서 번들 크기가 중요해서 SvelteKit 을 골랐다. React 와 비교하면 보일러플레이트가 적고 반응성이 문법에 녹아 있다.",
+    "expected": ["svelte"]
+  },
+  {
+    "id": "s03",
+    "title": "axum 핸들러에서 에러를 HTTP 응답으로 바꾸기",
+    "content": "IntoResponse 를 구현한 에러 타입 하나로 모든 핸들러의 에러를 통일했다. tokio 런타임 위에서 extractor 가 실패하면 어떻게 되는지도 확인했다.",
+    "expected": ["rust", "axum"]
+  },
+  {
+    "id": "s04",
+    "title": "고루틴 누수 찾기",
+    "content": "채널을 닫지 않아서 고루틴이 쌓이는 문제를 pprof 로 찾았다. Go 의 context 취소를 제대로 전달하는 패턴을 정리한다.",
+    "expected": ["go", "performance"]
+  },
+  {
+    "id": "s05",
+    "title": "Postgres 인덱스가 안 타는 이유",
+    "content": "EXPLAIN ANALYZE 로 보니 ILIKE '%단어%' 검색은 B-tree 인덱스를 못 쓴다. pg_trgm 확장으로 바꾼 뒤 조회가 40배 빨라졌다.",
+    "expected": ["postgresql", "performance"]
+  },
+  {
+    "id": "s06",
+    "title": "1GB 서버에서 Rust 빌드가 멈출 때",
+    "content": "서버에서 직접 cargo build 를 하면 메모리가 부족해 멈춘다. GitHub Actions 에서 이미지를 빌드해 레지스트리에 올리고 서버는 compose pull 만 하도록 바꿨다.",
+    "expected": ["ci-cd", "docker", "rust"]
+  },
+  {
+    "id": "s07",
+    "title": "백준 이분 탐색 문제 풀이",
+    "content": "정답이 단조 증가하는 성질을 이용해 답을 이분 탐색으로 찾는다. 경계값 처리에서 자주 틀리는 부분을 정리했다.\n```python\nlo, hi = 0, 10**9\n```",
+    "expected": ["algorithm"]
+  },
+  {
+    "id": "s08",
+    "title": "마크다운 렌더링 XSS 막기",
+    "content": "사용자가 쓴 마크다운을 그대로 HTML 로 바꾸면 스크립트가 실행될 수 있다. raw HTML 을 막고 링크의 javascript: 스킴을 걸러낸 과정을 정리한다.",
+    "expected": ["security", "react"]
+  },
+  {
+    "id": "s09",
+    "title": "팀 게시판 프로젝트 회고",
+    "content": "3주 동안 게시판을 만들면서 잘한 점, 아쉬운 점, 다음에 시도할 점을 KPT 로 정리했다. 일정 관리와 코드 리뷰 방식이 가장 큰 배움이었다.",
+    "expected": ["retrospective"]
+  },
+  {
+    "id": "s10",
+    "title": "tsconfig strict 옵션 하나씩 켜기",
+    "content": "기존 JS 프로젝트를 타입스크립트로 옮기면서 strict 옵션을 한 번에 켜지 않고 noImplicitAny 부터 하나씩 켰다.",
+    "expected": ["typescript"]
+  },
+  {
+    "id": "s11",
+    "title": "코드 블록에만 나오는 단어",
+    "content": "본문에는 특정 기술 이름이 없고 예시 코드에만 나온다.\n```\ndocker compose up\ncargo run\n```",
+    "expected": []
+  },
+  {
+    "id": "s12",
+    "title": "주간 스터디 일정 공지",
+    "content": "다음 주 스터디는 수요일 저녁 8시에 진행합니다. 발표 순서는 지난주와 같습니다.",
+    "expected": []
+  }
+]

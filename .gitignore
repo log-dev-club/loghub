@@ -33,3 +33,6 @@ api/uploads/
 
 # --- Docker ---
 # 루트 .env 는 docker compose 용 (이미 **/.env 로 무시됨)
+
+# --- 태그 추천 시험 결과 (로컬 전용) ---
+tools/jev-eval/results/
