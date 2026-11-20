@@ -7,7 +7,7 @@ use axum::{
 use crate::{
     error::AppError,
     extract::CurrentUser,
-    models::comment::{CommentDto, CommentRequest},
+    models::comment::{CommentDto, CommentRequest, CreateCommentRequest},
     services,
     state::AppState,
 };
@@ -22,14 +22,16 @@ pub async fn list(
     ))
 }
 
-/// POST /api/posts/{id}/comments
+/// POST /api/posts/{id}/comments — `parentId` 가 있으면 답글
 pub async fn create(
     State(state): State<AppState>,
     CurrentUser(user): CurrentUser,
     Path(post_id): Path<i64>,
-    Json(req): Json<CommentRequest>,
+    Json(req): Json<CreateCommentRequest>,
 ) -> Result<(StatusCode, Json<CommentDto>), AppError> {
-    let comment = services::comments::create(&state.pool, post_id, user.id, &req.content).await?;
+    let comment =
+        services::comments::create(&state.pool, post_id, user.id, &req.content, req.parent_id)
+            .await?;
     Ok((StatusCode::CREATED, Json(comment)))
 }
 

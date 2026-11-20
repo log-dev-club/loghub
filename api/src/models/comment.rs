@@ -8,6 +8,8 @@ use super::user::Author;
 pub struct CommentRow {
     pub id: i64,
     pub post_id: i64,
+    /// 답글이면 최상위 댓글 id, 최상위 댓글이면 None
+    pub parent_id: Option<i64>,
     pub content: String,
     pub created_at: OffsetDateTime,
     pub updated_at: OffsetDateTime,
@@ -20,6 +22,8 @@ pub struct CommentRow {
 pub struct CommentDto {
     pub id: i64,
     pub post_id: i64,
+    /// 최상위 댓글이면 null
+    pub parent_id: Option<i64>,
     pub content: String,
     pub author: Author,
     #[serde(with = "time::serde::rfc3339")]
@@ -33,6 +37,7 @@ impl From<CommentRow> for CommentDto {
         Self {
             id: r.id,
             post_id: r.post_id,
+            parent_id: r.parent_id,
             content: r.content,
             author: Author {
                 nickname: r.nickname,
@@ -44,7 +49,17 @@ impl From<CommentRow> for CommentDto {
     }
 }
 
-/// POST /api/posts/{id}/comments, PATCH /api/comments/{id}
+/// POST /api/posts/{id}/comments
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateCommentRequest {
+    pub content: String,
+    /// 답글을 달 댓글 id. 없으면 최상위 댓글
+    #[serde(default)]
+    pub parent_id: Option<i64>,
+}
+
+/// PATCH /api/comments/{id}
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CommentRequest {

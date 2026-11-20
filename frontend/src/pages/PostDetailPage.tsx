@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom'
 import Markdown from '../components/Markdown'
@@ -7,8 +7,12 @@ import type { LayoutContext } from '../components/Layout'
 import { deletePost, fetchPost, starPost, unstarPost } from '../api/posts'
 import { createComment, deleteComment, fetchComments } from '../api/comments'
 import { formatBytes, formatDate, formatDateTime } from '../utils/formatDate'
+import { splitMentions } from '../utils/mention'
 import type { Comment, PostDetail } from '../types'
 import './PostDetailPage.css'
+
+// 답글이 이 개수 이상이면 처음에는 접어 둔다
+const REPLY_COLLAPSE_THRESHOLD = 3
 
 function PostDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -24,7 +28,20 @@ function PostDetailPage() {
   const [error, setError] = useState<string | null>(null)
   const [commentText, setCommentText] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  // 답글 입력창이 열린 위치. parentId 는 입력창을 보여줄 최상위 댓글, commentId 는 답글을 누른 댓글
+  const [replyTarget, setReplyTarget] = useState<{ parentId: number; commentId: number } | null>(null)
+  const [replyText, setReplyText] = useState('')
+  const [replySubmitting, setReplySubmitting] = useState(false)
+  const [expandedThreads, setExpandedThreads] = useState<Set<number>>(new Set())
+  const replyInputRef = useRef<HTMLTextAreaElement>(null)
   const notFound = invalidId || loadFailed
+
+  useEffect(() => {
+    const input = replyInputRef.current
+    if (!input) return
+    input.focus()
+    input.setSelectionRange(input.value.length, input.value.length)
+  }, [replyTarget])
 
   useEffect(() => {
     if (invalidId) return
@@ -81,12 +98,66 @@ function PostDetailPage() {
     }
   }
 
+  const startReply = (comment: Comment) => {
+    if (!post) return
+    if (!user) {
+      navigate('/login', { state: { from: `/posts/${post.id}` } })
+      return
+    }
+    const parentId = comment.parentId ?? comment.id
+    setReplyTarget({ parentId, commentId: comment.id })
+    setReplyText(comment.parentId !== null ? `@${comment.author.nickname} ` : '')
+    expandThread(parentId)
+  }
+
+  const expandThread = (parentId: number) => {
+    setExpandedThreads((prev) => new Set(prev).add(parentId))
+  }
+
+  const toggleThread = (parentId: number) => {
+    setExpandedThreads((prev) => {
+      const next = new Set(prev)
+      if (next.has(parentId)) next.delete(parentId)
+      else next.add(parentId)
+      return next
+    })
+  }
+
+  const cancelReply = () => {
+    setReplyTarget(null)
+    setReplyText('')
+  }
+
+  const submitReply = async (event: FormEvent) => {
+    event.preventDefault()
+    if (!post || !replyTarget) return
+    setReplySubmitting(true)
+    setError(null)
+    try {
+      const created = await createComment(post.id, replyText, replyTarget.commentId)
+      setComments((prev) => [...prev, created])
+      setPost({ ...post, commentCount: post.commentCount + 1 })
+      cancelReply()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '답글 작성에 실패했습니다')
+    } finally {
+      setReplySubmitting(false)
+    }
+  }
+
   const removeComment = async (comment: Comment) => {
-    if (!post || !window.confirm('댓글을 삭제할까요?')) return
+    if (!post) return
+    const replyCount = comments.filter((item) => item.parentId === comment.id).length
+    const message =
+      replyCount > 0 ? `댓글을 삭제할까요? 답글 ${replyCount}개도 함께 삭제됩니다.` : '댓글을 삭제할까요?'
+    if (!window.confirm(message)) return
     try {
       await deleteComment(comment.id)
-      setComments((prev) => prev.filter((item) => item.id !== comment.id))
-      setPost({ ...post, commentCount: Math.max(0, post.commentCount - 1) })
+      setComments((prev) => prev.filter((item) => item.id !== comment.id && item.parentId !== comment.id))
+      setPost({ ...post, commentCount: Math.max(0, post.commentCount - 1 - replyCount) })
+      if (replyTarget && (replyTarget.commentId === comment.id || replyTarget.parentId === comment.id)) {
+        cancelReply()
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : '댓글 삭제에 실패했습니다')
     }
@@ -115,6 +186,50 @@ function PostDetailPage() {
     return (
       <div className="post-detail post-detail--empty">
         <p>불러오는 중...</p>
+      </div>
+    )
+  }
+
+  const topLevelComments = comments.filter((comment) => comment.parentId === null)
+  const repliesOf = (parentId: number) => comments.filter((comment) => comment.parentId === parentId)
+
+  const renderComment = (comment: Comment) => {
+    const author = comment.author
+    const canDelete = user ? user.nickname === author.nickname || isOwner || isAdmin : false
+    return (
+      <div className="comment">
+        <div className="comment__meta">
+          <Link className="comment__author" to={`/users/${encodeURIComponent(author.nickname)}`}>
+            {author.nickname}
+          </Link>
+          <time dateTime={comment.createdAt}>{formatDateTime(comment.createdAt)}</time>
+          {comment.updatedAt !== comment.createdAt && <span>(수정됨)</span>}
+          <span className="comment__actions">
+            <button type="button" className="comment__reply" onClick={() => startReply(comment)}>
+              답글
+            </button>
+            {canDelete && (
+              <button type="button" className="comment__delete" onClick={() => removeComment(comment)}>
+                삭제
+              </button>
+            )}
+          </span>
+        </div>
+        <p className="comment__content">
+          {splitMentions(comment.content).map((segment, index) =>
+            segment.type === 'mention' ? (
+              <Link
+                key={index}
+                className="comment__mention"
+                to={`/users/${encodeURIComponent(segment.nickname)}`}
+              >
+                @{segment.nickname}
+              </Link>
+            ) : (
+              segment.text
+            ),
+          )}
+        </p>
       </div>
     )
   }
@@ -194,25 +309,50 @@ function PostDetailPage() {
           <p className="comments__empty">첫 댓글을 남겨보세요.</p>
         ) : (
           <ul className="comments__list">
-            {comments.map((comment) => {
-              const canDelete = user
-                ? user.nickname === comment.author.nickname || isOwner || isAdmin
-                : false
+            {topLevelComments.map((comment) => {
+              const replies = repliesOf(comment.id)
+              const collapsible = replies.length >= REPLY_COLLAPSE_THRESHOLD
+              const expanded = !collapsible || expandedThreads.has(comment.id)
               return (
-                <li key={comment.id} className="comment">
-                  <div className="comment__meta">
-                    <Link className="comment__author" to={`/users/${encodeURIComponent(comment.author.nickname)}`}>
-                      {comment.author.nickname}
-                    </Link>
-                    <time dateTime={comment.createdAt}>{formatDateTime(comment.createdAt)}</time>
-                    {comment.updatedAt !== comment.createdAt && <span>(수정됨)</span>}
-                    {canDelete && (
-                      <button type="button" onClick={() => removeComment(comment)}>
-                        삭제
-                      </button>
-                    )}
-                  </div>
-                  <p className="comment__content">{comment.content}</p>
+                <li key={comment.id} className="comments__thread">
+                  {renderComment(comment)}
+                  {collapsible && (
+                    <button
+                      type="button"
+                      className="comments__toggle"
+                      onClick={() => toggleThread(comment.id)}
+                      aria-expanded={expanded}
+                    >
+                      {expanded ? '답글 숨기기' : `답글 ${replies.length}개 보기`}
+                    </button>
+                  )}
+                  {expanded && replies.length > 0 && (
+                    <ul className="comments__replies">
+                      {replies.map((reply) => (
+                        <li key={reply.id}>{renderComment(reply)}</li>
+                      ))}
+                    </ul>
+                  )}
+                  {replyTarget?.parentId === comment.id && (
+                    <form className="comment-form comment-form--reply" onSubmit={submitReply}>
+                      <textarea
+                        value={replyText}
+                        onChange={(event) => setReplyText(event.target.value)}
+                        rows={2}
+                        placeholder="답글을 입력하세요"
+                        ref={replyInputRef}
+                        required
+                      />
+                      <div className="comment-form__buttons">
+                        <button type="button" className="comment-form__cancel" onClick={cancelReply}>
+                          취소
+                        </button>
+                        <button type="submit" disabled={replySubmitting}>
+                          답글 작성
+                        </button>
+                      </div>
+                    </form>
+                  )}
                 </li>
               )
             })}
