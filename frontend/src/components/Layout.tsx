@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Outlet } from 'react-router-dom'
 import Header from './Header'
 import { fetchMe } from '../api/auth'
+import { refillPostTokens } from '../utils/anonSuggestions'
 import type { UserProfile } from '../types'
 
 /** 모든 페이지가 useOutletContext<LayoutContext>() 로 받는 값 */
@@ -39,6 +40,16 @@ function Layout() {
       cancelled = true
     }
   }, [])
+
+  // 익명 건의함 작성 토큰은 건의함에 들어갈 때가 아니라 사이트에 들어올 때 미리 받아 둔다.
+  // 받는 시점과 건의를 올리는 시점이 떨어져 있어야 운영자가 시각으로 작성자를 추측하기 어렵다
+  const userId = user?.id
+  useEffect(() => {
+    if (userId === undefined) return
+    refillPostTokens(userId).catch(() => {
+      // 실패하면 다음 방문 때 다시 받는다
+    })
+  }, [userId])
 
   return (
     <div className="app-shell">

@@ -22,6 +22,8 @@ argon2 = "0.5"
 rand = "0.8"
 # 첨부파일 해시 검증 (프론트엔드 hashFile.ts 와 동일한 SHA-256)
 sha2 = "0.10"
+# 익명 건의함 멤버 증명용 블라인드 서명 (RFC 9474). 운영자도 토큰 사용자를 알 수 없게 한다
+blind-rsa-signatures = "0.19"
 # 게시물 요약(excerpt) 생성 시 이미지/수식 마크다운 제거용
 regex = "1"
 # 요청 횟수 제한 (로그인/회원가입 무차별 대입 방어)
@@ -32,3 +34,16 @@ reqwest = { version = "0.12", default-features = false, features = ["json", "rus
 
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# 팀원 참고: 블라인드 서명용 RSA 키 생성·서명이 debug 빌드에서는 수십 초 걸리므로 암호 크레이트만 최적화한다
+[profile.dev.package.crypto-bigint]
+opt-level = 3
+
+[profile.dev.package.crypto-primes]
+opt-level = 3
+
+[profile.dev.package.rsa]
+opt-level = 3
+
+[profile.dev.package.blind-rsa-signatures]
+opt-level = 3
