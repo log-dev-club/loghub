@@ -95,17 +95,38 @@ export interface AdminUserPage {
   total: number
 }
 
-/** 익명 건의. 작성자 정보는 API 에 아예 존재하지 않는다 */
-export interface Suggestion {
+/** 익명 건의 (서버 응답). 작성자·공감자 정보는 API 에 아예 존재하지 않는다 */
+export interface SuggestionRaw {
   id: number
   title: string
   content: string
   /** YYYY-MM-DD (익명성을 위해 시각은 저장하지 않음) */
   createdOn: string
   voteCount: number
-  voted: boolean
-  /** 내가 쓴 건의인지 (본인에게만 true) */
+  /** 작성자 브라우저가 만든 무작위 값 */
+  authorRef: string
+  /** SHA-256(작성자 토큰). 브라우저 키로만 "내 건의" 인지 알 수 있다 */
+  authorDigest: string
+  /** 이 건의 전용 공감 서명 공개키 modulus (hex) */
+  voteKey: string
+  /** 공감 nullifier 앞 16자리 */
+  voteTags: string[]
+}
+
+/** 화면용 건의. mine·voted 는 브라우저가 자기 키로 계산한다 */
+export interface Suggestion extends SuggestionRaw {
   mine: boolean
+  voted: boolean
+}
+
+export interface SuggestionKeys {
+  postKey: string
+  postTokensPerDay: number
+}
+
+export interface SignedToken {
+  message: string
+  signature: string
 }
 
 export interface VoteResult {

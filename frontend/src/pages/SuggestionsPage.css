@@ -76,6 +76,54 @@
   font-size: 14px;
 }
 
+.suggestions-page__head-actions {
+  display: flex;
+  gap: 8px;
+  flex: none;
+}
+
+/* 복구 코드 */
+.suggestion-recovery {
+  margin-bottom: 16px;
+  padding: 12px;
+  border: 1px solid var(--color-border-default);
+  border-radius: 6px;
+  background-color: var(--color-canvas-subtle);
+}
+
+.suggestion-recovery__desc {
+  margin: 0 0 8px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--color-fg-muted);
+}
+
+.suggestion-recovery__row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.suggestion-recovery__code {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+  color: var(--color-fg-default);
+}
+
+.suggestion-recovery__row input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--color-border-default);
+  border-radius: 6px;
+  padding: 5px 10px;
+  font-size: 13px;
+  color: var(--color-fg-default);
+  background-color: var(--color-canvas-default);
+}
+
 /* 작성 폼 */
 .suggestion-form {
   margin-bottom: 16px;
