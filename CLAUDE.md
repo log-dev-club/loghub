@@ -156,7 +156,7 @@ frontend/src/
 | `sessions` | `20260914000000_add_auth_stars_profile.sql` | 로그인 세션 | `token` (PK, 64 hex), `user_id`, `expires_at` |
 | `posts` | `20260913000000_init.sql` | 게시물 | `title`, `summary` (excerpt), `content` (GFM 원문), `created_at`, `updated_at` |
 | `tags` / `post_tags` | `20260913000000_init.sql` | 태그 (N:M) | `name` (UNIQUE, 소문자 정규화) |
-| `comments` | `20260913000000_init.sql` | 댓글 | `post_id`, `user_id`, `content`, `updated_at` |
+| `comments` | `20260913000000_init.sql`, `20261120000000_add_comment_replies.sql` | 댓글 | `post_id`, `user_id`, `content`, `updated_at`, `parent_id` (답글이면 최상위 댓글 id, 1단계만. 부모 삭제 시 답글도 CASCADE 삭제) |
 | `post_stars` | `20260914000000_add_auth_stars_profile.sql` | 별 | PK(`post_id`, `user_id`) |
 | `post_attachments` | `20260913000001_add_post_attachments.sql` | 첨부 릴리즈 파일 | `post_id`, `original_name`, `hashed_name` (UNIQUE, 디스크 파일명), `size_bytes`, `sent_at` |
 
@@ -197,7 +197,7 @@ frontend/src/
 | GET | `/api/posts/{id}` | 선택 | 상세 (content, attachments, starred 포함) |
 | PATCH / DELETE | `/api/posts/{id}` | 작성자 / 작성자·관리자 | 수정 (`tags` 는 전체 교체) / 삭제 (첨부파일도 삭제) |
 | PUT / DELETE | `/api/posts/{id}/star` | 필요 | 별 추가 / 해제 → `{ starred, starCount }` |
-| GET / POST | `/api/posts/{id}/comments` | – / 필요 | 댓글 목록 (오래된 순) / 작성 |
+| GET / POST | `/api/posts/{id}/comments` | – / 필요 | 댓글 목록 (오래된 순, 답글 포함) / 작성 (`parentId` 가 있으면 답글) |
 | PATCH / DELETE | `/api/comments/{id}` | 작성자 / 작성자·글쓴이·관리자 | 댓글 수정 / 삭제 |
 | GET / POST | `/api/posts/{id}/attachments` | – / 작성자 | 첨부 목록 / 업로드 (multipart: `file`, `hashedName`, `sentAt`) |
 | GET / DELETE | `/api/attachments/{hashedName}` | – / 작성자 | 다운로드 (원본 파일명) / 삭제 |

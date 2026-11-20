@@ -45,7 +45,9 @@ interface PostDetail extends PostSummary {
 interface PostPage { items: PostSummary[]; page: number; limit: number; total: number }
 
 interface Comment {
-  id: number; postId: number; content: string; author: Author
+  id: number; postId: number
+  parentId: number | null  // 답글이면 최상위 댓글 id
+  content: string; author: Author
   createdAt: string; updatedAt: string
 }
 
@@ -227,14 +229,19 @@ interface Draft { title: string; content: string; tagsInput: string; updatedAt: 
 
 ## 댓글
 
+답글(대댓글)은 1단계만 있다. 최상위 댓글은 `parentId: null`, 답글은 `parentId` 가 최상위 댓글 id 다.
+
 ### GET /api/posts/{id}/comments
-- 200 + `Comment[]` (오래된 순).
+- 200 + `Comment[]` (최상위 댓글과 답글을 섞어 오래된 순). `parentId` 로 묶어서 보여주는 것은 클라이언트 몫.
 
 ### POST /api/posts/{id}/comments
 ```json
 { "content": "좋은 글이네요" }
+{ "content": "@yangmin 저도 그렇게 생각해요", "parentId": 12 }
 ```
 - 로그인 필요. 1~2000자. 201 + `Comment`.
+- `parentId` (선택): 답글을 달 댓글 id. 답글에 단 답글은 그 답글의 최상위 댓글 아래로 붙는다 (응답의 `parentId` 는 최상위 댓글 id).
+- 부모 댓글이 없으면 404, 다른 게시물의 댓글이면 400.
 
 ### PATCH /api/comments/{id}
 ```json
@@ -244,6 +251,7 @@ interface Draft { title: string; content: string; tagsInput: string; updatedAt: 
 
 ### DELETE /api/comments/{id}
 - 댓글 작성자·게시물 작성자 또는 관리자. 204.
+- 최상위 댓글을 삭제하면 그 아래 답글도 함께 삭제된다.
 
 ## 첨부파일
 

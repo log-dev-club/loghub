@@ -36,6 +36,8 @@ export interface PostPage {
 export interface Comment {
   id: number
   postId: number
+  /** 답글이면 최상위 댓글 id, 최상위 댓글이면 null */
+  parentId: number | null
   content: string
   author: Author
   createdAt: string
