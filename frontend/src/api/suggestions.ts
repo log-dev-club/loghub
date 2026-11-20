@@ -20,10 +20,11 @@ export const fetchSuggestions = (params: SuggestionListParams = {}) =>
 
 export const fetchSuggestionKeys = () => api<SuggestionKeys>('/api/suggestions/keys')
 
-export const requestPostTokens = (blindedMessages: string[]) =>
+/** postKey: 블라인드에 쓴 작성 키. 그 사이 달이 바뀌어 키가 달라지면 409 */
+export const requestPostTokens = (postKey: string, blindedMessages: string[]) =>
   api<{ blindSignatures: string[] }>('/api/suggestions/post-tokens', {
     method: 'POST',
-    body: JSON.stringify({ blindedMessages }),
+    body: JSON.stringify({ postKey, blindedMessages }),
   })
 
 export const requestVoteTokens = (items: { suggestionId: number; blindedMessage: string }[]) =>

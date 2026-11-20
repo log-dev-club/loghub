@@ -10,20 +10,22 @@
 //!   누구에게 발급된 것인지 서버 키를 갖고 있어도 계산할 수 없다 (블라인드 서명의 무조건적 비연결성).
 //! - 작성·삭제·공감·공감 취소 요청은 세션 쿠키 없이 받는다. 이 요청들을 처리하는 함수는 사용자 정보를
 //!   인자로 받지 않는다.
-//! - 작성 토큰: 전역 키 하나. 사람당 하루 N개 발급. 쓴 토큰은 SHA-256 만 남겨 재사용을 막는다.
+//! - 작성 토큰: 월별 키. 사람당 하루 N개 발급, 이번 달·지난달 키로 서명된 것만 받는다(유효기간 제한).
+//!   쓴 토큰은 SHA-256 만 남겨 재사용을 막는다.
 //! - 공감 토큰: 건의마다 다른 키. 사람당 건의 하나에 블라인드 값 하나만 서명해 1인 1공감을 지킨다.
 //! - "내 건의"·"내 공감" 판별에 쓰는 비밀 키는 브라우저에만 있다. 서버는 그 키로 만든 값의 해시만 본다.
 //! - 작성자 id, 닉네임, IP, 정확한 작성 시각을 DB 에도 로그에도 남기지 않는다.
 //!   이 모듈에서는 tracing 으로 사용자 관련 값이나 건의 내용을 출력하지 않는다.
 
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 use blind_rsa_signatures::{
     DefaultRng, Deterministic, KeyPair, PSSZero, PublicKey, SecretKey, Sha384, Signature,
 };
 use sha2::{Digest, Sha256};
 use sqlx::{PgPool, Postgres, QueryBuilder};
-use tokio::sync::OnceCell;
+use time::{Date, OffsetDateTime};
+use tokio::sync::Mutex;
 
 use super::to_hex;
 use crate::{
@@ -61,7 +63,8 @@ pub const POST_TOKENS_PER_DAY: i64 = 3;
 /// 공감 토큰 한 번에 요청할 수 있는 최대 개수
 const VOTE_TOKEN_BATCH_MAX: usize = LIST_LIMIT as usize;
 
-const POST_KEY_PURPOSE: &str = "post";
+/// 월별 작성 키 이름 앞부분 (`post:YYYY-MM`)
+const POST_KEY_PREFIX: &str = "post:";
 
 const SUGGESTION_SELECT: &str = "SELECT s.id, s.title, s.content, s.author_ref, s.author_digest, \
             s.vote_pk_der, s.created_on FROM suggestions s";
@@ -178,57 +181,117 @@ struct PostKey {
     modulus: String,
 }
 
-static POST_KEY: OnceCell<PostKey> = OnceCell::const_new();
+/// 월별 작성 키 캐시 (purpose → 키)
+static POST_KEYS: Mutex<Option<HashMap<String, Arc<PostKey>>>> = Mutex::const_new(None);
 
-/// 작성 토큰 서명 키. DB 에 없으면 만들어 저장한다.
+/// 작성 키 이름. 월마다 키를 바꿔 토큰 유효기간을 제한한다 (서버 시계 UTC 기준)
+fn post_key_purpose(date: Date) -> String {
+    format!(
+        "{POST_KEY_PREFIX}{:04}-{:02}",
+        date.year(),
+        u8::from(date.month())
+    )
+}
+
+fn previous_month(date: Date) -> Date {
+    date.replace_day(1)
+        .ok()
+        .and_then(|first| first.previous_day())
+        .unwrap_or(date)
+}
+
+/// 이번 달·지난달 작성 키 이름
+fn post_key_purposes() -> (String, String) {
+    let today = OffsetDateTime::now_utc().date();
+    (
+        post_key_purpose(today),
+        post_key_purpose(previous_month(today)),
+    )
+}
+
+/// 작성 토큰 서명 키. `create` 가 true 면 DB 에 없을 때 만들어 저장한다.
 /// 팀원 참고: 이 키는 DB 에 있어도 익명성에 영향이 없다 (블라인드 서명은 키를 알아도 연결할 수 없음).
-/// 키가 새어 나가면 토큰 위조(도배)만 가능해진다.
-async fn post_key(pool: &PgPool) -> Result<&'static PostKey, AppError> {
-    POST_KEY
-        .get_or_try_init(|| async {
-            let existing: Option<(Vec<u8>, Vec<u8>)> = sqlx::query_as(
-                "SELECT pk_der, sk_der FROM suggestion_signing_keys WHERE purpose = $1",
-            )
-            .bind(POST_KEY_PURPOSE)
+/// 키가 새어 나가면 토큰 위조(도배)만 가능해진다. 키를 월마다 바꾸므로 탈퇴한 멤버나 유출된 토큰도
+/// 길어야 다음 달까지만 쓸 수 있다 (서버는 토큰 주인을 모르므로 사람별 무효화는 불가능).
+async fn post_key(
+    pool: &PgPool,
+    purpose: &str,
+    create: bool,
+) -> Result<Option<Arc<PostKey>>, AppError> {
+    let mut cache = POST_KEYS.lock().await;
+    let cache = cache.get_or_insert_with(HashMap::new);
+    if let Some(key) = cache.get(purpose) {
+        return Ok(Some(key.clone()));
+    }
+
+    let select = "SELECT pk_der, sk_der FROM suggestion_signing_keys WHERE purpose = $1";
+    let mut stored: Option<(Vec<u8>, Vec<u8>)> = sqlx::query_as(select)
+        .bind(purpose)
+        .fetch_optional(pool)
+        .await?;
+    if stored.is_none() && create {
+        let (pk_der, sk_der) = generate_key().await?;
+        sqlx::query(
+            "INSERT INTO suggestion_signing_keys (purpose, pk_der, sk_der) \
+             VALUES ($1, $2, $3) ON CONFLICT (purpose) DO NOTHING",
+        )
+        .bind(purpose)
+        .bind(&pk_der)
+        .bind(&sk_der)
+        .execute(pool)
+        .await?;
+        // 다른 서버 프로세스가 먼저 저장했을 수 있으므로 저장된 값을 다시 읽는다
+        stored = sqlx::query_as(select)
+            .bind(purpose)
             .fetch_optional(pool)
             .await?;
-            let (pk_der, sk_der) = match existing {
-                Some(keys) => keys,
-                None => {
-                    let (pk_der, sk_der) = generate_key().await?;
-                    sqlx::query(
-                        "INSERT INTO suggestion_signing_keys (purpose, pk_der, sk_der) \
-                         VALUES ($1, $2, $3) ON CONFLICT (purpose) DO NOTHING",
-                    )
-                    .bind(POST_KEY_PURPOSE)
-                    .bind(&pk_der)
-                    .bind(&sk_der)
-                    .execute(pool)
-                    .await?;
-                    // 동시에 다른 요청이 먼저 저장했을 수 있으므로 저장된 값을 다시 읽는다
-                    sqlx::query_as(
-                        "SELECT pk_der, sk_der FROM suggestion_signing_keys WHERE purpose = $1",
-                    )
-                    .bind(POST_KEY_PURPOSE)
-                    .fetch_one(pool)
-                    .await?
-                },
-            };
-            let pk = parse_pk(&pk_der)?;
-            let modulus = modulus_hex(&pk);
-            Ok(PostKey {
-                pk,
-                sk: parse_sk(&sk_der)?,
-                modulus,
-            })
-        })
-        .await
+        // 지난달보다 오래된 키는 더 이상 쓰지 않으므로 지운다
+        sqlx::query(
+            "DELETE FROM suggestion_signing_keys WHERE purpose LIKE 'post:%' AND purpose < $1",
+        )
+        .bind(post_key_purpose(previous_month(
+            OffsetDateTime::now_utc().date(),
+        )))
+        .execute(pool)
+        .await?;
+    }
+    let Some((pk_der, sk_der)) = stored else {
+        return Ok(None);
+    };
+    let pk = parse_pk(&pk_der)?;
+    let key = Arc::new(PostKey {
+        modulus: modulus_hex(&pk),
+        pk,
+        sk: parse_sk(&sk_der)?,
+    });
+    // 지난 달 키가 캐시에 쌓이지 않도록 이번 달·지난달 것만 남긴다
+    let (current, previous) = post_key_purposes();
+    cache.retain(|k, _| *k == current || *k == previous);
+    cache.insert(purpose.to_string(), key.clone());
+    Ok(Some(key))
+}
+
+/// 이번 달 작성 키 (없으면 만든다)
+async fn current_post_key(pool: &PgPool) -> Result<Arc<PostKey>, AppError> {
+    let (current, _) = post_key_purposes();
+    post_key(pool, &current, true)
+        .await?
+        .ok_or_else(|| AppError::Internal("post key missing".into()))
+}
+
+/// 만료·위조·이미 쓴 작성 토큰. 브라우저는 409 를 받으면 그 토큰을 버리고 다음 토큰으로 다시 시도한다
+fn unusable_post_token() -> AppError {
+    AppError::conflict("작성 토큰이 만료되었거나 이미 사용되었습니다")
 }
 
 /// GET /api/suggestions/keys
 pub async fn keys(pool: &PgPool) -> Result<SuggestionKeysDto, AppError> {
+    let current = current_post_key(pool).await?;
+    let (_, previous) = post_key_purposes();
+    let previous = post_key(pool, &previous, false).await?;
     Ok(SuggestionKeysDto {
-        post_key: post_key(pool).await?.modulus.clone(),
+        post_key: current.modulus.clone(),
+        previous_post_key: previous.map(|k| k.modulus.clone()),
         post_tokens_per_day: POST_TOKENS_PER_DAY,
     })
 }
@@ -251,7 +314,14 @@ pub async fn issue_post_tokens(
         .iter()
         .map(|m| decode_hex(m, RSA_BYTES, "블라인드 메시지"))
         .collect::<Result<Vec<_>, _>>()?;
-    let key = post_key(pool).await?;
+    let key = current_post_key(pool).await?;
+    // 브라우저가 /keys 를 받은 뒤 달이 바뀌었으면 다른 키로 블라인드한 것이므로 서명하지 않는다
+    // (발급 개수도 차감하지 않음. 브라우저는 409 를 받으면 키를 다시 받아 재시도한다)
+    if !hash_eq(&req.post_key, &key.modulus) {
+        return Err(AppError::conflict(
+            "작성 키가 바뀌었습니다. 다시 시도해주세요",
+        ));
+    }
 
     let mut tx = pool.begin().await?;
     // 지난 날짜 발급 기록은 쿼터 계산에 필요 없으므로 남기지 않는다
@@ -407,6 +477,22 @@ fn to_dto(row: SuggestionRow, vote_tags: Vec<String>) -> Result<SuggestionDto, A
 // 익명 요청 (세션 없음. 이 아래 함수들은 사용자 정보를 받지 않는다)
 // ---------------------------------------------------------------------------
 
+/// 작성 토큰을 이번 달 → 지난달 키 순서로 검증한다. 둘 다 아니면(만료·위조) 409
+async fn verify_post_token(pool: &PgPool, token: &SignedToken) -> Result<Vec<u8>, AppError> {
+    // 형식 오류는 400 으로 먼저 걸러낸다
+    decode_hex(&token.message, TOKEN_BYTES, "토큰")?;
+    decode_hex(&token.signature, RSA_BYTES, "토큰 서명")?;
+    let (current, previous) = post_key_purposes();
+    for purpose in [current, previous] {
+        if let Some(key) = post_key(pool, &purpose, false).await?
+            && let Ok(message) = verify_token(&key.pk, token)
+        {
+            return Ok(message);
+        }
+    }
+    Err(unusable_post_token())
+}
+
 /// POST /api/suggestions — 작성 토큰으로 멤버임을 증명한다
 pub async fn create(
     pool: &PgPool,
@@ -416,20 +502,32 @@ pub async fn create(
     let content = required_text(&req.content, CONTENT_MAX, "내용")?;
     let author_ref = validate_hex(&req.author_ref, AUTHOR_REF_BYTES, "작성자 값")?;
     let author_digest = validate_hex(&req.author_digest, 32, "작성자 값")?;
-    let key = post_key(pool).await?;
-    let message = verify_token(&key.pk, &req.token)?;
+    let message = verify_post_token(pool, &req.token).await?;
+    let token_digest = sha256_hex(&message);
+
+    // 이미 쓴 토큰은 RSA 키 생성(비싼 작업) 전에 거른다. 같은 토큰을 반복해 보내 CPU 를 쓰게 하는 것을 막는다
+    let (already_spent,): (bool,) = sqlx::query_as(
+        "SELECT EXISTS (SELECT 1 FROM suggestion_spent_tokens WHERE token_digest = $1)",
+    )
+    .bind(&token_digest)
+    .fetch_one(pool)
+    .await?;
+    if already_spent {
+        return Err(unusable_post_token());
+    }
 
     let (vote_pk_der, vote_sk_der) = generate_key().await?;
 
     let mut tx = pool.begin().await?;
+    // 위 확인과 이 사이에 같은 토큰이 동시에 들어온 경우는 여기서 한 번 더 막는다
     let spent = sqlx::query(
         "INSERT INTO suggestion_spent_tokens (token_digest) VALUES ($1) ON CONFLICT DO NOTHING",
     )
-    .bind(sha256_hex(&message))
+    .bind(&token_digest)
     .execute(&mut *tx)
     .await?;
     if spent.rows_affected() == 0 {
-        return Err(AppError::conflict("이미 사용한 작성 토큰입니다"));
+        return Err(unusable_post_token());
     }
     let (id,): (i64,) = sqlx::query_as(
         "INSERT INTO suggestions (title, content, author_ref, author_digest, vote_pk_der, vote_sk_der) \
@@ -530,6 +628,16 @@ mod tests {
         assert_eq!(decode_hex("00ff", 2, "x").unwrap(), vec![0, 255]);
         assert!(decode_hex("00f", 2, "x").is_err());
         assert!(decode_hex("zzzz", 2, "x").is_err());
+    }
+
+    #[test]
+    fn post_key_purpose_rotates_monthly() {
+        use time::Month;
+        let jan = Date::from_calendar_date(2027, Month::January, 15).unwrap();
+        assert_eq!(post_key_purpose(jan), "post:2027-01");
+        assert_eq!(post_key_purpose(previous_month(jan)), "post:2026-12");
+        let mar1 = Date::from_calendar_date(2026, Month::March, 1).unwrap();
+        assert_eq!(post_key_purpose(previous_month(mar1)), "post:2026-02");
     }
 
     #[test]

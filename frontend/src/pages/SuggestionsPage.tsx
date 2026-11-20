@@ -84,24 +84,28 @@ function SuggestionsPage() {
     setError(null)
     try {
       if (postTokenCount(userId) === 0) await refillPostTokens(userId)
-      const prepared = preparePost(userId)
-      if (!prepared) {
-        setError('오늘 받을 수 있는 작성 토큰을 모두 썼어요. 내일 다시 시도해주세요.')
-        return
-      }
-      try {
-        await createSuggestion({
-          title,
-          content,
-          authorRef: prepared.authorRef,
-          authorDigest: prepared.authorDigest,
-          token: prepared.token,
-        })
-        prepared.consume()
-      } catch (err) {
-        // 이미 쓴 토큰이면 버리고, 그 밖의 실패(네트워크·입력 오류 등)면 다음에 다시 쓸 수 있게 남긴다
-        if (err instanceof ApiError && err.status === 409) prepared.consume()
-        throw err
+      // 만료·이미 쓴 토큰(409)이면 버리고 다음 토큰으로 다시 시도한다.
+      // 그 밖의 실패(네트워크·입력 오류 등)면 토큰을 남겨 다음에 다시 쓸 수 있게 한다
+      for (;;) {
+        const prepared = preparePost(userId)
+        if (!prepared) {
+          setError('지금 쓸 수 있는 작성 토큰이 없어요. 내일 다시 시도해주세요.')
+          return
+        }
+        try {
+          await createSuggestion({
+            title,
+            content,
+            authorRef: prepared.authorRef,
+            authorDigest: prepared.authorDigest,
+            token: prepared.token,
+          })
+          prepared.consume()
+          break
+        } catch (err) {
+          if (!(err instanceof ApiError && err.status === 409)) throw err
+          prepared.consume()
+        }
       }
       setTitle('')
       setContent('')
@@ -314,6 +318,12 @@ function RecoveryPanel({ userId, onImported }: { userId: number; onImported: () 
 
   const apply = (event: FormEvent) => {
     event.preventDefault()
+    const ok = window.confirm(
+      '이 기기의 복구 코드를 바꿀까요?\n\n' +
+        '- 지금 코드를 따로 적어 두지 않았다면, 이 기기에서 쓴 건의는 더 이상 "내 건의" 로 보이지 않고 삭제할 수 없어요.\n' +
+        '- 다른 사람이 준 코드는 절대 넣지 마세요. 그 사람이 내가 쓰는 건의를 알아보고 삭제할 수 있어요.',
+    )
+    if (!ok) return
     if (importRecoveryCode(userId, input)) onImported()
     else setMessage('복구 코드 형식이 올바르지 않아요 (영문·숫자 64자).')
   }
@@ -323,7 +333,7 @@ function RecoveryPanel({ userId, onImported }: { userId: number; onImported: () 
       <p className="suggestion-recovery__desc">
         내 건의·내 공감을 알아보는 열쇠는 서버가 아니라 <strong>이 브라우저에만</strong> 저장돼요.
         다른 기기에서도 보려면 아래 코드를 그 기기의 건의함에 붙여넣으세요. 코드를 잃어버리면 내
-        건의를 삭제할 수 없어요. 누구에게도 보여주지 마세요.
+        건의를 삭제할 수 없어요. 누구에게도 보여주지 말고, 남이 준 코드는 넣지 마세요.
       </p>
       <div className="suggestion-recovery__row">
         <code className="suggestion-recovery__code">{code}</code>

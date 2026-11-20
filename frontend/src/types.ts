@@ -120,7 +120,10 @@ export interface Suggestion extends SuggestionRaw {
 }
 
 export interface SuggestionKeys {
+  /** 이번 달 작성 키 modulus */
   postKey: string
+  /** 지난달 작성 키. 이 키로 받아 둔 토큰도 아직 쓸 수 있다 */
+  previousPostKey: string | null
   postTokensPerDay: number
 }
 

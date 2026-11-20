@@ -24,12 +24,15 @@ import type { SignedToken, Suggestion, SuggestionRaw } from '../types'
 const POST_TOKEN_POOL_MAX = 10
 const VOTE_TAG_LEN = 16
 
+/** 작성 토큰. 서명한 작성 키(월별)를 함께 기억해 만료된 것을 버린다 */
+interface PostToken extends SignedToken {
+  key: string
+}
+
 interface Vault {
   /** 건의함 키 (hex 64자) */
   key: string
-  /** 작성 토큰 서명 공개키. 서버 키가 바뀌면 쌓아 둔 토큰을 버린다 */
-  postKey?: string
-  postTokens: SignedToken[]
+  postTokens: PostToken[]
   /** 마지막으로 작성 토큰을 받은 날 (YYYY-MM-DD) */
   postTokensFetchedOn?: string
   /** 건의 id → 공감 토큰 서명 (hex) */
@@ -56,8 +59,8 @@ function load(userId: number): Vault {
       if (typeof parsed.key === 'string' && /^[0-9a-f]{64}$/.test(parsed.key)) {
         return {
           key: parsed.key,
-          postKey: parsed.postKey,
-          postTokens: parsed.postTokens ?? [],
+          // 작성 키를 기억하지 않는 예전 형식 토큰은 버린다
+          postTokens: (parsed.postTokens ?? []).filter((t) => typeof t.key === 'string'),
           postTokensFetchedOn: parsed.postTokensFetchedOn,
           voteSignatures: parsed.voteSignatures ?? {},
         }
@@ -194,7 +197,7 @@ export async function refillPostTokens(userId: number) {
   const vault = load(userId)
   if (vault.postTokensFetchedOn === today()) return
 
-  const { postKey, postTokensPerDay } = await fetchSuggestionKeys()
+  const { postKey, previousPostKey, postTokensPerDay } = await fetchSuggestionKeys()
   const pk = parsePublicKey(postKey)
   const prepared = Array.from({ length: postTokensPerDay }, () => {
     const msg = randomBytes(32)
@@ -204,18 +207,20 @@ export async function refillPostTokens(userId: number) {
     }
   })
   const { blindSignatures } = await requestPostTokens(
+    postKey,
     prepared.map((p) => toHex(p.blinded.blindedMessage)),
   )
-  const fresh = blindSignatures.map((sig, i) => ({
+  const fresh: PostToken[] = blindSignatures.map((sig, i) => ({
+    key: postKey,
     message: toHex(prepared[i].msg),
     signature: toHex(finalize(pk, prepared[i].msg, fromHex(sig), prepared[i].blinded.inverse)),
   }))
 
   const latest = load(userId)
-  const kept = latest.postKey === postKey ? latest.postTokens : []
+  // 서버가 더 이상 받지 않는 키(지난달보다 오래된 것)로 서명된 토큰은 버린다
+  const kept = latest.postTokens.filter((t) => t.key === postKey || t.key === previousPostKey)
   save(userId, {
     ...latest,
-    postKey,
     postTokens: [...kept, ...fresh].slice(-POST_TOKEN_POOL_MAX),
     postTokensFetchedOn: today(),
   })
@@ -228,14 +233,15 @@ export function postTokenCount(userId: number): number {
 /** 건의 작성 요청 본문에 들어갈 값. 토큰은 꺼내는 순간 목록에서 빠진다 */
 export function preparePost(userId: number) {
   const vault = load(userId)
-  const token = vault.postTokens[0]
-  if (!token) return null
+  const stored = vault.postTokens[0]
+  if (!stored) return null
+  const token: SignedToken = { message: stored.message, signature: stored.signature }
   const authorRef = toHex(randomBytes(16))
   return {
     token,
     authorRef,
     authorDigest: toHex(sha256(authorToken(vault, authorRef))),
-    /** 서버가 토큰을 받았으면(성공 또는 이미 쓴 토큰) 호출해 목록에서 지운다 */
+    /** 서버가 토큰을 받았으면(성공, 또는 만료·이미 쓴 토큰이라 409) 호출해 목록에서 지운다 */
     consume: () => {
       const latest = load(userId)
       save(userId, {

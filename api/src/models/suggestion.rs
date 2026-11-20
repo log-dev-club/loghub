@@ -48,8 +48,10 @@ pub struct SuggestionListQuery {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SuggestionKeysDto {
-    /// 작성 토큰 서명 공개키의 modulus (e = 65537)
+    /// 이번 달 작성 토큰 서명 공개키의 modulus (e = 65537)
     pub post_key: String,
+    /// 지난달 키. 이 키로 받아 둔 토큰도 아직 쓸 수 있다
+    pub previous_post_key: Option<String>,
     /// 하루에 받을 수 있는 작성 토큰 수
     pub post_tokens_per_day: i64,
 }
@@ -58,6 +60,8 @@ pub struct SuggestionKeysDto {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PostTokenRequest {
+    /// 블라인드에 쓴 작성 키 modulus. 이번 달 키와 다르면 409
+    pub post_key: String,
     pub blinded_messages: Vec<String>,
 }
 
