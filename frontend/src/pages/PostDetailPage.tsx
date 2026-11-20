@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom'
 import Markdown from '../components/Markdown'
-import { CommentIcon } from '../components/icons'
+import { CommentIcon, EyeIcon } from '../components/icons'
 import type { LayoutContext } from '../components/Layout'
 import { deletePost, fetchPost, starPost, unstarPost } from '../api/posts'
 import { createComment, deleteComment, fetchComments } from '../api/comments'
@@ -141,6 +141,9 @@ function PostDetailPage() {
           ))}
         </div>
         <div className="post-detail__stats">
+          <span className="post-detail__view-count" title="조회수">
+            <EyeIcon /> {post.viewCount}
+          </span>
           <button
             type="button"
             className={`post-detail__star ${post.starred ? 'is-active' : ''}`}

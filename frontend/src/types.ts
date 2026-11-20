@@ -16,6 +16,8 @@ export interface PostSummary {
   updatedAt: string
   commentCount: number
   starCount: number
+  /** 게시물을 본 로그인 사용자 수 (한 사람당 한 번, 작성자 본인 제외) */
+  viewCount: number
   starred: boolean
   hasImage: boolean
 }

@@ -38,7 +38,7 @@ pub async fn create(
     Ok((StatusCode::CREATED, Json(post)))
 }
 
-/// GET /api/posts/{id}
+/// GET /api/posts/{id} — 로그인한 사용자가 처음 볼 때만 조회수 1 증가 (작성자 본인 제외)
 pub async fn get(
     State(state): State<AppState>,
     MaybeUser(viewer): MaybeUser,
@@ -46,7 +46,7 @@ pub async fn get(
 ) -> Result<Json<PostDetail>, AppError> {
     let viewer_id = viewer.map(|u| u.id);
     Ok(Json(
-        services::posts::get_post(&state.pool, post_id, viewer_id).await?,
+        services::posts::view_post(&state.pool, post_id, viewer_id).await?,
     ))
 }
 

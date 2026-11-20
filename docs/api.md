@@ -33,6 +33,7 @@ interface PostSummary {
   updatedAt: string
   commentCount: number
   starCount: number
+  viewCount: number      // 게시물을 본 로그인 사용자 수 (한 사람당 한 번, 작성자 본인 제외)
   starred: boolean       // 요청자가 별을 눌렀는지 (비로그인 false)
   hasImage: boolean      // 본문에 마크다운 이미지가 하나라도 있는지 (목록 아이콘 표시용)
 }
@@ -209,6 +210,8 @@ interface Draft { title: string; content: string; tagsInput: string; updatedAt: 
 
 ### GET /api/posts/{id}
 - 200 + `PostDetail`. 없으면 404.
+- 로그인한 사용자가 이 게시물을 **처음** 조회할 때만 `viewCount` 가 1 올라가고, 올라간 값이 응답에 담긴다 (`post_views` 테이블에 기록).
+- 같은 사용자의 두 번째 조회부터, 비로그인 조회, 작성자 본인 조회(수정 화면 진입 포함)는 세지 않는다.
 
 ### PATCH /api/posts/{id}
 ```json

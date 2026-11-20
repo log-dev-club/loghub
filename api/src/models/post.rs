@@ -13,6 +13,7 @@ pub struct PostRow {
     pub content: String,
     pub created_at: OffsetDateTime,
     pub updated_at: OffsetDateTime,
+    pub view_count: i64,
     pub nickname: String,
     pub avatar_url: Option<String>,
     pub tags: Vec<String>,
@@ -39,6 +40,8 @@ pub struct PostSummary {
     pub updated_at: OffsetDateTime,
     pub comment_count: i64,
     pub star_count: i64,
+    /// 게시물을 본 로그인 사용자 수 (한 사람당 한 번, 작성자 본인 제외)
+    pub view_count: i64,
     pub starred: bool,
     /// 본문에 마크다운 이미지(`![...](...)`)가 하나라도 있는지. 홈 목록의 이미지 아이콘 표시용
     pub has_image: bool,
@@ -70,6 +73,7 @@ impl PostRow {
             updated_at: self.updated_at,
             comment_count: self.comment_count,
             star_count: self.star_count,
+            view_count: self.view_count,
             starred: self.starred,
             has_image,
         }

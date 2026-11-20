@@ -58,6 +58,7 @@
   gap: 12px;
 }
 
+.post-detail__view-count,
 .post-detail__comment-count {
   display: inline-flex;
   align-items: center;

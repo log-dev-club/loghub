@@ -154,10 +154,11 @@ frontend/src/
 |---|---|---|---|
 | `users` | `..init`, `..20260914000000`, `..20260914100000`, `..20260918000000` | 사용자 | `nickname` (UNIQUE), `password_hash` (argon2, GitHub 가입은 빈 문자열), `avatar_url`, `bio`, `github_id` (UNIQUE), `github_login`, `role` (`user`/`admin`/`super_admin`, 기본 `user`) |
 | `sessions` | `20260914000000_add_auth_stars_profile.sql` | 로그인 세션 | `token` (PK, 64 hex), `user_id`, `expires_at` |
-| `posts` | `20260913000000_init.sql` | 게시물 | `title`, `summary` (excerpt), `content` (GFM 원문), `created_at`, `updated_at` |
+| `posts` | `20260913000000_init.sql`, `20261120000000_add_post_view_count.sql` | 게시물 | `title`, `summary` (excerpt), `content` (GFM 원문), `created_at`, `updated_at`, `view_count` (본 로그인 사용자 수, 한 사람당 한 번, 작성자 본인 제외) |
 | `tags` / `post_tags` | `20260913000000_init.sql` | 태그 (N:M) | `name` (UNIQUE, 소문자 정규화) |
 | `comments` | `20260913000000_init.sql` | 댓글 | `post_id`, `user_id`, `content`, `updated_at` |
 | `post_stars` | `20260914000000_add_auth_stars_profile.sql` | 별 | PK(`post_id`, `user_id`) |
+| `post_views` | `20261120010000_add_post_views.sql` | 조회 기록 (조회수 중복 방지) | PK(`post_id`, `user_id`), `created_at` |
 | `post_attachments` | `20260913000001_add_post_attachments.sql` | 첨부 릴리즈 파일 | `post_id`, `original_name`, `hashed_name` (UNIQUE, 디스크 파일명), `size_bytes`, `sent_at` |
 
 - 데이터베이스 생성은 마이그레이션이 아니라 `main.rs` 시작 단계(`Postgres::create_database`)에서 한다. 마이그레이션 SQL 은 이미 접속한 DB 안에서 실행되므로 `CREATE DATABASE` 를 넣을 수 없다.
@@ -194,7 +195,7 @@ frontend/src/
 | GET | `/api/users/{nickname}/posts` | – | 특정 사용자의 게시물 |
 | GET | `/api/posts` | 선택 | 최신순 목록 + 검색/필터/페이지 |
 | POST | `/api/posts` | 필요 | 게시물 작성 → Discord 알림 |
-| GET | `/api/posts/{id}` | 선택 | 상세 (content, attachments, starred 포함) |
+| GET | `/api/posts/{id}` | 선택 | 상세 (content, attachments, starred 포함). 로그인 사용자의 첫 조회만 조회수 +1 (작성자 본인 제외) |
 | PATCH / DELETE | `/api/posts/{id}` | 작성자 / 작성자·관리자 | 수정 (`tags` 는 전체 교체) / 삭제 (첨부파일도 삭제) |
 | PUT / DELETE | `/api/posts/{id}/star` | 필요 | 별 추가 / 해제 → `{ starred, starCount }` |
 | GET / POST | `/api/posts/{id}/comments` | – / 필요 | 댓글 목록 (오래된 순) / 작성 |
@@ -212,7 +213,7 @@ frontend/src/
 - 마이페이지(`/me`): 프로필(닉네임, 아바타, 소개) 조회·수정, 내가 올린 게시물 목록, 비밀번호 변경
 
 ### Main
-- 최신 게시물 순(`created_at DESC`)으로 표시. 카드에 작성자, 날짜, 태그, 별 수, 댓글 수
+- 최신 게시물 순(`created_at DESC`)으로 표시. 카드에 작성자, 날짜, 태그, 조회수, 별 수, 댓글 수
 - 게시물별 댓글 (작성·수정·삭제). 삭제는 댓글 작성자 또는 게시물 작성자
 - 별(star): 로그인 사용자당 게시물 하나에 한 번
 

@@ -38,7 +38,7 @@ static INLINE_MATH_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\$[^$\n]+
 /// viewer 는 `starred` 계산용 (비로그인은 None → false).
 fn push_base_select(qb: &mut QueryBuilder<'_, Postgres>, viewer: Option<i64>) {
     qb.push(
-        "SELECT p.id, p.title, p.summary, p.content, p.created_at, p.updated_at, \
+        "SELECT p.id, p.title, p.summary, p.content, p.created_at, p.updated_at, p.view_count, \
                 u.nickname, u.avatar_url, \
                 COALESCE(array_agg(DISTINCT t.name::text) FILTER (WHERE t.name IS NOT NULL), ARRAY[]::text[]) AS tags, \
                 (SELECT count(*) FROM comments c WHERE c.post_id = p.id) AS comment_count, \
@@ -129,6 +129,44 @@ pub async fn get_post(
 
     let attachments = attachments::list_for_post(pool, post_id).await?;
     Ok(row.into_detail(attachments))
+}
+
+/// 게시물 상세 화면을 열 때 호출. 조회수를 센 뒤 상세를 돌려준다.
+/// 조회수는 로그인한 사용자가 그 게시물을 **처음** 볼 때만 1 올린다 (한 사람당 한 번).
+/// 비로그인 조회와 작성자 본인 조회(수정 화면 진입 포함)는 세지 않는다.
+pub async fn view_post(
+    pool: &PgPool,
+    post_id: i64,
+    viewer: Option<i64>,
+) -> Result<PostDetail, AppError> {
+    let author_id = owner_id(pool, post_id).await?; // 존재 확인 (404)
+
+    if let Some(user_id) = viewer
+        && user_id != author_id
+    {
+        let mut tx = pool.begin().await?;
+        // 이미 본 사용자면 PK(post_id, user_id) 충돌로 아무 행도 추가되지 않는다 (별 기능과 같은 방식)
+        let first_view = sqlx::query(
+            "INSERT INTO post_views (post_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+        )
+        .bind(post_id)
+        .bind(user_id)
+        .execute(&mut *tx)
+        .await?
+        .rows_affected()
+            == 1;
+
+        // 처음 본 경우에만 +1. 같은 사람이 동시에 여러 번 열어도 INSERT 는 한 번만 성공하므로 한 번만 오른다
+        if first_view {
+            sqlx::query("UPDATE posts SET view_count = view_count + 1 WHERE id = $1")
+                .bind(post_id)
+                .execute(&mut *tx)
+                .await?;
+        }
+        tx.commit().await?;
+    }
+
+    get_post(pool, post_id, viewer).await
 }
 
 /// 게시물 작성자 id. 없으면 404.

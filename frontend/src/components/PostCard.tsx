@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import type { PostSummary } from '../types'
 import { formatDate } from '../utils/formatDate'
-import { CommentIcon, ImageIcon } from './icons'
+import { CommentIcon, EyeIcon, ImageIcon } from './icons'
 import './PostCard.css'
 
 interface PostCardProps {
@@ -30,6 +30,9 @@ function PostCard({ post }: PostCardProps) {
           ))}
         </div>
         <div className="post-card__stats">
+          <span className="post-card__view-count" title="조회수">
+            <EyeIcon /> {post.viewCount}
+          </span>
           <span>{post.starred ? '★' : '☆'} {post.starCount}</span>
           <span className="post-card__comment-count">
             <CommentIcon /> {post.commentCount}
