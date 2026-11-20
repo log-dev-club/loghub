@@ -216,6 +216,25 @@
   gap: 8px;
 }
 
+.comments__toggle {
+  margin: 6px 0 0 20px;
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--color-accent-fg);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.comments__toggle:hover {
+  text-decoration: underline;
+}
+
+.comment__mention {
+  color: var(--color-accent-fg);
+  font-weight: 600;
+}
+
 .comment-form--reply {
   margin: 8px 0 0 34px;
 }

@@ -7,8 +7,12 @@ import type { LayoutContext } from '../components/Layout'
 import { deletePost, fetchPost, starPost, unstarPost } from '../api/posts'
 import { createComment, deleteComment, fetchComments } from '../api/comments'
 import { formatBytes, formatDate, formatDateTime } from '../utils/formatDate'
+import { splitMentions } from '../utils/mention'
 import type { Comment, PostDetail } from '../types'
 import './PostDetailPage.css'
+
+// 답글이 이 개수 이상이면 처음에는 접어 둔다
+const REPLY_COLLAPSE_THRESHOLD = 3
 
 function PostDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -28,6 +32,7 @@ function PostDetailPage() {
   const [replyTarget, setReplyTarget] = useState<{ parentId: number; commentId: number } | null>(null)
   const [replyText, setReplyText] = useState('')
   const [replySubmitting, setReplySubmitting] = useState(false)
+  const [expandedThreads, setExpandedThreads] = useState<Set<number>>(new Set())
   const replyInputRef = useRef<HTMLTextAreaElement>(null)
   const notFound = invalidId || loadFailed
 
@@ -99,8 +104,23 @@ function PostDetailPage() {
       navigate('/login', { state: { from: `/posts/${post.id}` } })
       return
     }
-    setReplyTarget({ parentId: comment.parentId ?? comment.id, commentId: comment.id })
-    setReplyText(comment.parentId !== null && comment.author ? `@${comment.author.nickname} ` : '')
+    const parentId = comment.parentId ?? comment.id
+    setReplyTarget({ parentId, commentId: comment.id })
+    setReplyText(comment.parentId !== null ? `@${comment.author.nickname} ` : '')
+    expandThread(parentId)
+  }
+
+  const expandThread = (parentId: number) => {
+    setExpandedThreads((prev) => new Set(prev).add(parentId))
+  }
+
+  const toggleThread = (parentId: number) => {
+    setExpandedThreads((prev) => {
+      const next = new Set(prev)
+      if (next.has(parentId)) next.delete(parentId)
+      else next.add(parentId)
+      return next
+    })
   }
 
   const cancelReply = () => {
@@ -195,7 +215,21 @@ function PostDetailPage() {
             )}
           </span>
         </div>
-        <p className="comment__content">{comment.content}</p>
+        <p className="comment__content">
+          {splitMentions(comment.content).map((segment, index) =>
+            segment.type === 'mention' ? (
+              <Link
+                key={index}
+                className="comment__mention"
+                to={`/users/${encodeURIComponent(segment.nickname)}`}
+              >
+                @{segment.nickname}
+              </Link>
+            ) : (
+              segment.text
+            ),
+          )}
+        </p>
       </div>
     )
   }
@@ -277,10 +311,22 @@ function PostDetailPage() {
           <ul className="comments__list">
             {topLevelComments.map((comment) => {
               const replies = repliesOf(comment.id)
+              const collapsible = replies.length >= REPLY_COLLAPSE_THRESHOLD
+              const expanded = !collapsible || expandedThreads.has(comment.id)
               return (
                 <li key={comment.id} className="comments__thread">
                   {renderComment(comment)}
-                  {replies.length > 0 && (
+                  {collapsible && (
+                    <button
+                      type="button"
+                      className="comments__toggle"
+                      onClick={() => toggleThread(comment.id)}
+                      aria-expanded={expanded}
+                    >
+                      {expanded ? '답글 숨기기' : `답글 ${replies.length}개 보기`}
+                    </button>
+                  )}
+                  {expanded && replies.length > 0 && (
                     <ul className="comments__replies">
                       {replies.map((reply) => (
                         <li key={reply.id}>{renderComment(reply)}</li>
