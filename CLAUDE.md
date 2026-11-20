@@ -77,6 +77,7 @@ cargo clippy              # 린트
 | `TRUST_PROXY_HEADERS` | false | 리버스 프록시 뒤에서만 true. X-Forwarded-For 의 IP 를 신뢰 |
 | `SERVER_HOST` | 127.0.0.1 | 바인딩 주소. Docker 에서는 0.0.0.0 |
 | `COOKIE_SECURE` | false | HTTPS 배포에서 true. 세션 쿠키 Secure 속성 |
+| `SUGGESTION_SECRET` | 없음 (기동 시 임시 키) | 익명 건의함 작성자·공감 HMAC 키. 운영에서는 반드시 설정하고 바꾸지 않는다 (바뀌면 '내 건의'를 다시 찾을 수 없음) |
 
 ### Frontend (`frontend/`)
 ```bash
@@ -158,6 +159,7 @@ frontend/src/
 | `tags` / `post_tags` | `20260913000000_init.sql` | 태그 (N:M) | `name` (UNIQUE, 소문자 정규화) |
 | `comments` | `20260913000000_init.sql` | 댓글 | `post_id`, `user_id`, `content`, `updated_at` |
 | `post_stars` | `20260914000000_add_auth_stars_profile.sql` | 별 | PK(`post_id`, `user_id`) |
+| `suggestions` / `suggestion_votes` | `20261120000000_add_suggestions.sql` | 익명 건의함 / 공감 | 작성자 평문 컬럼 없음. `author_hash` (건의별 HMAC), `created_on` (날짜만). 공감은 PK(`suggestion_id`, `voter_hash`) |
 | `post_attachments` | `20260913000001_add_post_attachments.sql` | 첨부 릴리즈 파일 | `post_id`, `original_name`, `hashed_name` (UNIQUE, 디스크 파일명), `size_bytes`, `sent_at` |
 
 - 데이터베이스 생성은 마이그레이션이 아니라 `main.rs` 시작 단계(`Postgres::create_database`)에서 한다. 마이그레이션 SQL 은 이미 접속한 DB 안에서 실행되므로 `CREATE DATABASE` 를 넣을 수 없다.
@@ -202,6 +204,9 @@ frontend/src/
 | GET / POST | `/api/posts/{id}/attachments` | – / 작성자 | 첨부 목록 / 업로드 (multipart: `file`, `hashedName`, `sentAt`) |
 | GET / DELETE | `/api/attachments/{hashedName}` | – / 작성자 | 다운로드 (원본 파일명) / 삭제 |
 | GET | `/api/tags` | – | 사용 중인 태그와 게시물 수 |
+| GET / POST | `/api/suggestions` | 필요 | 익명 건의 목록 (`sort`, `mine=true`) / 작성 (작성자는 건의별 HMAC 으로만 기록) |
+| DELETE | `/api/suggestions/{id}` | 작성자 본인 | 삭제 (관리자도 불가) |
+| PUT / DELETE | `/api/suggestions/{id}/vote` | 필요 | 공감 추가 / 취소 |
 | GET | `/api/admin/users` | 관리자 | 전체 사용자 목록 (`q` 닉네임 검색, 페이지) |
 | PUT | `/api/admin/users/{nickname}/role` | 최고 관리자 | 관리자 권한 부여/해제 (`role`: `user` \| `admin`) |
 
@@ -210,6 +215,11 @@ frontend/src/
 ### Header
 - 검색창: `tag:react user:yangmin 자유텍스트` 형식. `tag:`/`user:` 접두어는 필터, 나머지는 제목·요약·닉네임·태그 검색
 - 마이페이지(`/me`): 프로필(닉네임, 아바타, 소개) 조회·수정, 내가 올린 게시물 목록, 비밀번호 변경
+
+### 익명 건의함 (`/suggestions`)
+- 멤버만 접근. 작성자 user_id·닉네임·IP·정확한 시각을 **평문으로 저장하지도 로그에 남기지도 않는다** (`services/suggestions.rs` 상단 원칙 참고)
+- 운영자 개념이 없다. 모든 멤버가 동등하게 쓰고 공감하며, 내 건의는 나만 삭제할 수 있다
+- 작성자·공감자는 `HMAC(SUGGESTION_SECRET, "용도:사용자id:건의id")` 로만 기록. 로그아웃·다른 기기에서도 "내 건의" 탭에서 다시 볼 수 있다
 
 ### Main
 - 최신 게시물 순(`created_at DESC`)으로 표시. 카드에 작성자, 날짜, 태그, 별 수, 댓글 수

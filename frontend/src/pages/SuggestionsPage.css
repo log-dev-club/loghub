@@ -1,0 +1,278 @@
+.suggestions-page {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 24px 16px 64px;
+}
+
+.suggestions-page__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.suggestions-page__title {
+  font-size: 20px;
+  margin: 0 0 4px;
+}
+
+.suggestions-page__subtitle {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-fg-muted);
+}
+
+.suggestions-page button {
+  border: 1px solid var(--color-border-default);
+  background-color: var(--color-canvas-default);
+  color: var(--color-fg-default);
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.suggestions-page button:not(:disabled):hover {
+  background-color: var(--color-neutral-muted);
+}
+
+.suggestions-page button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.suggestions-page .suggestions-page__primary {
+  background-color: var(--color-success-fg);
+  border-color: var(--color-success-fg);
+  color: var(--color-canvas-inset);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.suggestions-page .suggestions-page__primary:not(:disabled):hover {
+  background-color: var(--color-success-fg);
+  filter: brightness(1.1);
+}
+
+.suggestions-page__notice {
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  font-size: 13px;
+  border: 1px solid var(--color-success-fg);
+  border-radius: 6px;
+  color: var(--color-success-fg);
+}
+
+.suggestions-page__error {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: var(--color-danger-fg);
+}
+
+.suggestions-page__empty {
+  color: var(--color-fg-muted);
+  padding: 24px 0;
+  font-size: 14px;
+}
+
+/* 작성 폼 */
+.suggestion-form {
+  margin-bottom: 16px;
+  padding: 12px;
+  border: 1px solid var(--color-border-default);
+  border-radius: 6px;
+  background-color: var(--color-canvas-subtle);
+}
+
+.suggestion-form__field {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 13px;
+}
+
+.suggestion-form__field > span {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.suggestion-form__field em {
+  font-style: normal;
+  color: var(--color-fg-subtle);
+  font-size: 12px;
+}
+
+.suggestion-form input,
+.suggestion-form textarea {
+  width: 100%;
+  border: 1px solid var(--color-border-default);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 14px;
+  color: var(--color-fg-default);
+  background-color: var(--color-canvas-default);
+}
+
+.suggestion-form textarea {
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.suggestion-form__hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-fg-muted);
+}
+
+.suggestion-form__footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.suggestion-form__actions {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+/* 필터 / 정렬 */
+.suggestions-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--color-border-muted);
+}
+
+.suggestions-toolbar__tabs,
+.suggestions-toolbar__sort {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.suggestions-page .suggestions-toolbar button {
+  border-color: transparent;
+  color: var(--color-fg-muted);
+  padding: 4px 10px;
+}
+
+.suggestions-page .suggestions-toolbar button.is-active {
+  border-color: var(--color-border-default);
+  color: var(--color-fg-default);
+  background-color: var(--color-canvas-subtle);
+}
+
+/* 목록 */
+.suggestion-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.suggestion-item {
+  display: flex;
+  gap: 12px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--color-border-muted);
+}
+
+.suggestions-page .suggestion-item__vote {
+  flex: none;
+  align-self: flex-start;
+  width: 52px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 6px 0;
+  color: var(--color-fg-muted);
+}
+
+.suggestion-item__vote strong {
+  font-size: 15px;
+  color: var(--color-fg-default);
+}
+
+.suggestion-item__vote small {
+  font-size: 11px;
+}
+
+.suggestions-page .suggestion-item__vote.is-voted {
+  border-color: var(--color-accent-emphasis);
+  color: var(--color-accent-fg);
+}
+
+.suggestion-item__vote.is-voted strong {
+  color: var(--color-accent-fg);
+}
+
+.suggestion-item__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.suggestion-item__meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--color-fg-subtle);
+}
+
+.suggestion-item__mine {
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--color-accent-fg);
+  color: var(--color-accent-fg);
+  font-weight: 600;
+}
+
+.suggestion-item__title {
+  margin: 6px 0 4px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.suggestion-item__content {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--color-fg-default);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.suggestion-item__actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.suggestions-page .suggestion-item__actions button {
+  font-size: 12px;
+  padding: 3px 10px;
+}
+
+.suggestions-page .suggestion-item__actions button.is-danger {
+  color: var(--color-danger-fg);
+  border-color: var(--color-danger-fg);
+}
+
+.suggestion-item__confirm {
+  font-size: 12px;
+  color: var(--color-danger-fg);
+}
+
+@media (max-width: 560px) {
+  .suggestions-page__head {
+    flex-direction: column;
+  }
+}

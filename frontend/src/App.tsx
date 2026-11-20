@@ -7,6 +7,7 @@ import PostDetailPage from './pages/PostDetailPage'
 import LoginPage from './pages/LoginPage'
 import UserProfilePage from './pages/UserProfilePage'
 import AdminPage from './pages/AdminPage'
+import SuggestionsPage from './pages/SuggestionsPage'
 import './App.css'
 
 function App() {
@@ -19,6 +20,7 @@ function App() {
           <Route path="/write" element={<WritePage />} />
           <Route path="/me" element={<MyPage />} />
           <Route path="/admin" element={<AdminPage />} />
+          <Route path="/suggestions" element={<SuggestionsPage />} />
           <Route path="/posts/:id" element={<PostDetailPage />} />
           <Route path="/posts/:id/edit" element={<WritePage />} />
           <Route path="/users/:nickname" element={<UserProfilePage />} />

@@ -26,6 +26,7 @@ dependencies = [
  "axum-extra",
  "dotenvy",
  "governor",
+ "hmac",
  "rand 0.8.8",
  "regex",
  "reqwest",

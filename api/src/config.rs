@@ -32,6 +32,9 @@ pub struct Config {
     pub server_host: String,
     /// true 면 세션 쿠키에 Secure 속성을 붙여 HTTPS 에서만 전송되게 한다. HTTPS 배포 시 반드시 켠다
     pub cookie_secure: bool,
+    /// 익명 건의함 작성자·공감 HMAC 키. 미설정이면 기동할 때마다 무작위로 만든다
+    /// (재시작하면 "내 건의" 를 다시 찾을 수 없고 공감 중복 방지도 초기화되므로 운영에서는 반드시 설정)
+    pub suggestion_secret: Vec<u8>,
 }
 
 fn non_empty(key: &str) -> Option<String> {
@@ -102,6 +105,18 @@ impl Config {
         let server_host = non_empty("SERVER_HOST").unwrap_or_else(|| "127.0.0.1".into());
         let cookie_secure = env_bool("COOKIE_SECURE", false);
 
+        let suggestion_secret = match non_empty("SUGGESTION_SECRET") {
+            Some(secret) => secret.into_bytes(),
+            None => {
+                tracing::warn!(
+                    "SUGGESTION_SECRET 미설정: 임시 키를 사용합니다. 서버를 재시작하면 익명 건의함의 '내 건의'·공감 기록을 다시 확인할 수 없습니다"
+                );
+                let mut key = vec![0u8; 32];
+                rand::Rng::fill(&mut rand::thread_rng(), key.as_mut_slice());
+                key
+            },
+        };
+
         Self {
             database_url,
             server_port,
@@ -115,6 +130,7 @@ impl Config {
             trust_proxy_headers,
             server_host,
             cookie_secure,
+            suggestion_secret,
         }
     }
 }

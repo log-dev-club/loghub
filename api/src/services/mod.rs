@@ -9,6 +9,7 @@ pub mod drafts;
 pub mod github;
 pub mod images;
 pub mod posts;
+pub mod suggestions;
 pub mod tags;
 pub mod users;
 

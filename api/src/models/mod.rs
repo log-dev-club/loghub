@@ -8,5 +8,6 @@ pub mod comment;
 pub mod draft;
 pub mod image;
 pub mod post;
+pub mod suggestion;
 pub mod tag;
 pub mod user;

@@ -94,3 +94,21 @@ export interface AdminUserPage {
   limit: number
   total: number
 }
+
+/** 익명 건의. 작성자 정보는 API 에 아예 존재하지 않는다 */
+export interface Suggestion {
+  id: number
+  title: string
+  content: string
+  /** YYYY-MM-DD (익명성을 위해 시각은 저장하지 않음) */
+  createdOn: string
+  voteCount: number
+  voted: boolean
+  /** 내가 쓴 건의인지 (본인에게만 true) */
+  mine: boolean
+}
+
+export interface VoteResult {
+  voted: boolean
+  voteCount: number
+}

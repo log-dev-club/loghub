@@ -16,8 +16,8 @@ function Header({ query, onQueryChange, user }: HeaderProps) {
   const lastScrollY = useRef(0)
   const navigate = useNavigate()
   const { pathname } = useLocation()
-  // 게시물 상세 화면에서는 검색창을 표시하지 않는다
-  const showSearch = !matchPath('/posts/:id', pathname)
+  // 게시물 상세·익명 건의함 화면에서는 게시물 검색창을 표시하지 않는다
+  const showSearch = !matchPath('/posts/:id', pathname) && !matchPath('/suggestions', pathname)
 
   useEffect(() => {
     const handleScroll = () => {
@@ -49,6 +49,9 @@ function Header({ query, onQueryChange, user }: HeaderProps) {
           <div className="site-header__side site-header__side--right">
             {user ? (
               <>
+                <Link className="site-header__admin-link" to="/suggestions">
+                  건의함
+                </Link>
                 {(user.role === 'admin' || user.role === 'super_admin') && (
                   <Link className="site-header__admin-link" to="/admin">
                     관리자
