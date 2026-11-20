@@ -309,37 +309,6 @@ const { url } = await fetch('/api/images', { method: 'POST', body: form }).then(
 ### GET /api/tags
 - 200 + `TagCount[]`. 게시물이 1개 이상인 태그만, 많이 쓰인 순.
 
-## 익명 건의함
-
-운영자 개념이 없다. 로그인한 멤버 누구나 동등하게 쓰고·공감하고, 자기 건의만 지울 수 있다 (관리자도 예외 없음).
-**작성자를 식별할 수 있는 값(user_id, 닉네임, IP, 정확한 시각)은 어디에도 평문으로 저장하지 않는다.**
-응답에도 작성자 필드가 없다. 날짜는 시각 없이 `YYYY-MM-DD` 로만 내려준다.
-
-작성자·공감자는 `HMAC-SHA256(SUGGESTION_SECRET, "author|vote:사용자id:건의id")` 로만 기록한다.
-- 건의마다 값이 달라 같은 사람이 쓴/공감한 기록끼리 묶을 수 없다. `author` 와 `vote` 도 서로 대조할 수 없다.
-- 요청한 사용자로 다시 계산해 비교하므로, 로그아웃 후 다시 로그인하거나 다른 기기에서도 "내 건의" 를 찾을 수 있다.
-- DB 만으로는 작성자를 알 수 없다. 서버 키와 DB 를 **둘 다** 가진 사람만 사용자 id 를 대입해 추측할 수 있으므로 키는 DB 와 분리해 보관한다.
-
-`Suggestion`
-```json
-{ "id": 3, "title": "발표 순서를 돌아가며 정해요", "content": "...", "createdOn": "2026-11-20",
-  "voteCount": 4, "voted": true, "mine": false }
-```
-- `mine`: 요청한 사용자가 쓴 건의인지. 본인에게만 `true` 로 보인다.
-
-### GET /api/suggestions?sort=votes|latest&mine=true
-- 200 + `Suggestion[]`. `sort` 기본값은 공감순. 전체 보기는 최대 200개, `mine=true` 면 내가 쓴 건의 전부.
-
-### POST /api/suggestions
-- 요청 `{ "title": "...(1~100자)", "content": "...(1~3000자)" }`. IP 당 요청 횟수 제한 적용 (IP 는 메모리에서만 쓰고 저장하지 않음).
-- 201 + `Suggestion` (`mine: true`).
-
-### DELETE /api/suggestions/{id}
-- 작성자 본인만. 204. 다른 사람(관리자 포함)은 403.
-
-### PUT / DELETE /api/suggestions/{id}/vote
-- 공감 추가 / 취소 → 200 + `{ "voted": bool, "voteCount": n }`. 같은 사람이 여러 번 눌러도 한 번만 집계된다.
-
 ## 프론트엔드 연동 현황
 
 `src/api/` 의 fetch 래퍼를 통해 아래 화면이 연동되어 있다.
@@ -351,7 +320,6 @@ const { url } = await fetch('/api/images', { method: 'POST', body: form }).then(
 | HomePage | `GET /api/posts` (검색창 → `tag`/`user`/`q`, 250ms 디바운스) |
 | PostDetailPage | `GET /api/posts/{id}`, 댓글 목록/작성/삭제, 별 토글, 게시물 삭제, 첨부 다운로드, 작성자에게 `/posts/{id}/edit` 수정 링크 노출 |
 | WritePage (`/write`, `/posts/{id}/edit`) | `POST /api/posts` 또는 `PATCH /api/posts/{id}` → 첨부파일마다 `POST /api/posts/{id}/attachments`, 기존 첨부 삭제는 `DELETE /api/attachments/{hashedName}`. 임시저장(`GET`/`PUT`/`DELETE /api/users/me/draft`)은 새 글 작성 모드에서만 동작 |
-| SuggestionsPage (`/suggestions`) | `GET /api/suggestions` (전체 / 내 건의 탭, 공감순·최신순), `POST /api/suggestions`, 공감 `PUT`/`DELETE /api/suggestions/{id}/vote`, 내 건의 `DELETE` |
 | MyPage | `GET /api/users/me/posts`, `PATCH /api/users/me`, `POST /api/auth/logout` |
 
 아직 UI 가 없는 API: 댓글 수정, 비밀번호 변경, 다른 사용자 프로필/게시물, 태그 목록.
